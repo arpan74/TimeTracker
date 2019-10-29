@@ -1,57 +1,177 @@
-const { app, BrowserWindow } = require('electron');
+const electron = require("electron");
+const { ipcRenderer } = electron;
+const { createEvent } = require("./createEvent");
+const path = require("path");
+const BrowserWindow = electron.remote.BrowserWindow;
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) { // eslint-disable-line global-require
-  app.quit();
+let fileSaveLoc = "/Users/arpangupta/Downloads";
+
+let tracking = false;
+let startTime, settingsWindow;
+
+document.getElementById("resetTracking").addEventListener("click", e => {
+  tracking = false;
+  resetFields();
+  document.getElementById("diff").innerHTML = "";
+});
+
+document.getElementById("Settings").addEventListener("click", e => {
+  settingsWindow = new BrowserWindow({
+    frame: true,
+    width: 350,
+    height: 200,
+    width: 800,
+    height: 800,
+    webPreferences: {
+      nodeIntegration: true
+    }
+  });
+
+  settingsWindow.loadURL(`file://${__dirname}/settings.html`);
+});
+
+function convertMS(milliseconds) {
+  var day, hour, minute, seconds;
+  seconds = Math.floor(milliseconds / 1000);
+  minute = Math.floor(seconds / 60);
+  seconds = seconds % 60;
+  hour = Math.floor(minute / 60);
+  minute = minute % 60;
+  day = Math.floor(hour / 24);
+  hour = hour % 24;
+  return {
+    day: day,
+    hour: hour,
+    minute: minute,
+    seconds: seconds
+  };
 }
 
-// Keep a global reference of the window object, if you don't, the window will
-// be closed automatically when the JavaScript object is garbage collected.
-let mainWindow;
+function formatDelta(time) {
+  var timeStr = "";
+  if (time.day > 0) {
+    console.log("Ayo");
+    if (time.day > 1) {
+      timeStr = timeStr.concat(`${time.day} days `);
+    } else {
+      timeStr = timeStr.concat(`${time.day} day `);
+    }
+  }
 
-const createWindow = () => {
-  // Create the browser window.
-  mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-  });
+  if (time.hour > 0) {
+    if (time.hour > 1) {
+      timeStr = timeStr.concat(`${time.hour} hours `);
+    } else {
+      timeStr = timeStr.concat(`${time.hour} hour `);
+    }
+  } else {
+    if (time.day > 0) {
+      timeStr = timeStr.concat("0 hours ");
+    }
+  }
 
-  // and load the index.html of the app.
-  mainWindow.loadURL(`file://${__dirname}/index.html`);
+  if (time.minute > 0) {
+    if (time.minute > 1) {
+      timeStr = timeStr.concat(`${time.minute} minutes `);
+    } else {
+      timeStr = timeStr.concat(`${time.minute} minute `);
+    }
+  } else {
+    if (time.day > 0 || time.hour > 0) {
+      timeStr = timeStr.concat("0 minutes ");
+    }
+  }
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  if (time.seconds === 1) {
+    timeStr = timeStr.concat(`${time.seconds} second`);
+  } else {
+    timeStr = timeStr.concat(`${time.seconds} seconds`);
+  }
 
-  // Emitted when the window is closed.
-  mainWindow.on('closed', () => {
-    // Dereference the window object, usually you would store windows
-    // in an array if your app supports multi windows, this is the time
-    // when you should delete the corresponding element.
-    mainWindow = null;
-  });
-};
+  return timeStr;
+}
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+function manageTime() {
+  if (tracking === false) {
+    return;
+  }
+  var diff = document.getElementById("diff");
+  diff.innerHTML = findDifference();
+  var refresh = 1000;
+  setTimeout(manageTime, refresh);
+}
 
-// Quit when all windows are closed.
-app.on('window-all-closed', () => {
-  // On OS X it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
-  if (process.platform !== 'darwin') {
-    app.quit();
+function findDifference() {
+  timeDelta = new Date() - startTime;
+  return formatDelta(convertMS(timeDelta));
+}
+
+document.getElementById("now").addEventListener("click", e => {
+  updateStartTime();
+});
+
+function updateStartTime() {
+  var now = new Date();
+  startTime = now;
+  var utcString = now.toISOString().substring(0, 19);
+  var year = now.getFullYear();
+  var month = now.getMonth() + 1;
+  var day = now.getDate();
+  var hour = now.getHours();
+  var minute = now.getMinutes();
+  var second = now.getSeconds();
+  var localDatetime =
+    year +
+    "-" +
+    (month < 10 ? "0" + month.toString() : month) +
+    "-" +
+    (day < 10 ? "0" + day.toString() : day) +
+    "T" +
+    (hour < 10 ? "0" + hour.toString() : hour) +
+    ":" +
+    (minute < 10 ? "0" + minute.toString() : minute) +
+    utcString.substring(16, 19);
+  var datetimeField = document.getElementById("startTimeDate");
+  datetimeField.value = localDatetime;
+}
+
+document.getElementById("startTimeDate").addEventListener("change", e => {
+  startTime = new Date(e.target.value);
+});
+
+ipcRenderer.on("newStartTime", event => {
+  if (tracking === false) {
+    updateStartTime();
   }
 });
 
-app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (mainWindow === null) {
-    createWindow();
-  }
+ipcRenderer.on("fileLocation", (event, path) => {
+  fileSaveLoc = path[0];
+  settingsWindow.close();
 });
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
+const startButton = document.getElementById("startTracking");
+startButton.addEventListener("click", e => {
+  if (startTime === null) {
+    updateStartTime();
+  }
+  tracking = true;
+  manageTime();
+});
+
+function resetFields() {
+  startTime = null;
+  document.getElementById("startTimeDate").value = null;
+  document.getElementById("eventNameText").value = null;
+}
+
+const endButton = document.getElementById("endTracking");
+endButton.addEventListener("click", e => {
+  console.log("Wazup");
+  eventName = document.getElementById("eventNameText").value;
+  var endTime = new Date();
+  console.log(fileSaveLoc);
+  createEvent(eventName, startTime, endTime, fileSaveLoc);
+  tracking = false;
+  resetFields();
+});

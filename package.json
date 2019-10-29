@@ -3,7 +3,7 @@
   "productName": "timetracker",
   "version": "1.0.0",
   "description": "Track how much time you spend on projects and store it as an ics",
-  "main": "src/index.js",
+  "main": "src/main.js",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
@@ -45,7 +45,8 @@
     }
   },
   "dependencies": {
-    "electron-squirrel-startup": "^1.0.0"
+    "electron-squirrel-startup": "^1.0.0",
+    "immutable-ics": "^0.4.0"
   },
   "devDependencies": {
     "@electron-forge/cli": "6.0.0-beta.45",
