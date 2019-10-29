@@ -20,8 +20,6 @@ document.getElementById("Settings").addEventListener("click", e => {
     frame: true,
     width: 350,
     height: 200,
-    width: 800,
-    height: 800,
     webPreferences: {
       nodeIntegration: true
     }
